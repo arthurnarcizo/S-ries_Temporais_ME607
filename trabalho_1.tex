@@ -1,0 +1,531 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage[hyphens]{url}
+\usepackage{hyperref}
+
+\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+\setstretch{1.3}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=blue!70!black,
+    urlcolor=blue!70!black
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Projeto 1 — Modelo Teórico Prophet}
+\lhead{Séries Temporais}
+\cfoot{\thepage}
+
+\begin{document}
+
+% ---- CAPA ----
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Large \textbf{UNIVERSIDADE ESTADUAL DE CAMPINAS}}\\[0.2cm]
+{\large Séries Temporais}\\[3cm]
+{\LARGE \textbf{Modelo Prophet para Séries Temporais:\\
+Teoria, Ilustração e Discussão Crítica}}\\[2cm]
+{\Large Projeto 1 — Modelo Teórico}\\[3cm]
+{\large
+\textbf{Nome:} Arthur Lourenço Narcizo da Silva\\[0.2cm]
+\textbf{RA:} 236043\\[0.2cm]
+}
+{\large Campinas, \today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+\section{Introdução}
+
+O modelo \textbf{Prophet}, proposto por Taylor e Letham (2018),
+é um modelo aditivo generalizado para séries temporais com
+tendência, sazonalidade e feriados, estimado via inferência
+bayesiana.
+
+Este relatório apresenta: (i)~a formulação matemática,
+(ii)~uma ilustração com o índice de produção industrial
+brasileiro (IBGE, Série 21859 do BCB), e (iii)~discussão crítica.
+
+% ============================================================
+\section{Formulação Teórica}
+
+\subsection{Decomposição}
+
+O Prophet decompõe $y(t)$ em componentes interpretáveis:
+\begin{equation}
+    y(t) = g(t) + s(t) + h(t) + \varepsilon_t,
+    \quad \varepsilon_t \sim \mathcal{N}(0, \sigma^2)
+    \label{eq:prophet}
+\end{equation}
+onde $g(t)$ é a tendência, $s(t)$ a sazonalidade e $h(t)$
+feriados. No modo multiplicativo:
+$y(t) = g(t)(1 + s(t)) + h(t) + \varepsilon_t$.
+
+\subsection{Tendência com \textit{changepoints}}
+
+\begin{equation}
+    g(t) = \big(k + \mathbf{a}(t)^\top\boldsymbol{\delta}\big)\,t
+    + \big(m + \mathbf{a}(t)^\top\boldsymbol{\gamma}\big)
+    \label{eq:trend}
+\end{equation}
+onde $k$ é a taxa base, $m$ o intercepto,
+$a_j(t) = \mathbf{1}[t \geq s_j]$, $\delta_j$ ajusta a taxa
+no \textit{changepoint} $s_j$, e $\gamma_j = -s_j\delta_j$
+garante continuidade. O prior regularizador é:
+\begin{equation}
+    \delta_j \sim \text{Laplace}(0, \tau)
+\end{equation}
+com $\tau$ (\texttt{changepoint\_prior\_scale}) controlando a
+flexibilidade da tendência.
+
+\subsection{Sazonalidade (Fourier)}
+
+\begin{equation}
+    s(t) = \sum_{n=1}^{N}\!\left(
+    a_n\cos\!\frac{2\pi nt}{P} + b_n\sin\!\frac{2\pi nt}{P}
+    \right), \quad
+    \boldsymbol{\beta} \sim \mathcal{N}(\mathbf{0}, \sigma_s^2\mathbf{I})
+    \label{eq:fourier}
+\end{equation}
+com período $P$ e ordem $N$. O prior $\sigma_s$
+(\texttt{seasonality\_prior\_scale}) controla a amplitude.
+
+\subsection{Feriados}
+
+$h(t) = \sum_i \kappa_i \cdot \mathbf{1}[t \in D_i]$,
+com $\kappa_i \sim \mathcal{N}(0, \nu^2)$.
+
+\subsection{Estimação}
+
+Os parâmetros são estimados via MAP usando L-BFGS no
+\textit{backend} Stan (Carpenter et al., 2017):
+\begin{equation}
+    \hat{\boldsymbol{\theta}} = \arg\max_{\boldsymbol{\theta}}
+    \big[\log p(\mathbf{y}|\boldsymbol{\theta}) +
+    \log p(\boldsymbol{\theta})\big]
+\end{equation}
+Intervalos de confiança são gerados por simulação da incerteza
+em $\boldsymbol{\delta}$, $\boldsymbol{\beta}$ e $\varepsilon_t$.
+
+\subsection{Comparação com ARIMA}
+
+\begin{table}[H]
+\centering
+\caption{Prophet vs.\ modelos do conteúdo programático.}
+\begin{tabular}{lcc}
+    \toprule
+    \textbf{Aspecto} & \textbf{ARIMA} & \textbf{Prophet} \\
+    \midrule
+    Abordagem & Box-Jenkins & GAM bayesiano \\
+    Estacionariedade & Requer & Não requer \\
+    Sazonalidade & $(P,D,Q)_s$ & Fourier \\
+    Tendência & Diferenciação & Changepoints \\
+    ICs & Analíticos & Simulação \\
+    Estimação & MLE & MAP (Stan) \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\section{Ilustração: Produção Industrial Brasileira}
+
+\subsection{Dados}
+
+A série utilizada é o \textbf{Índice de Produção Industrial}
+(base = 100), calculado pelo \textbf{IBGE} na Pesquisa Industrial
+Mensal --- Produção Física (PIM-PF), disponibilizado pelo Banco
+Central do Brasil (Série 21859 do SGS).
+
+\begin{itemize}[nosep]
+    \item \textbf{Fonte}: IBGE/PIM-PF, via BCB/SGS --- Série 21859
+    \item \textbf{URL}: \nolinkurl{https://api.bcb.gov.br/dados/serie/bcdata.sgs.21859/dados?formato=csv}
+    \item \textbf{Variável}: Índice de produção industrial (base = 100)
+    \item \textbf{Período}: janeiro de 2002 a janeiro de 2026
+    \item \textbf{Observações}: 289
+    \item \textbf{Frequência}: Mensal
+\end{itemize}
+
+A série reflete o nível de atividade da indústria brasileira e
+apresenta tendência, sazonalidade (queda em janeiro/fevereiro e
+dezembro por férias coletivas) e choques estruturais (crise de
+2008, recessão 2015--2016, COVID-19 em 2020).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{01_serie.png}
+\caption{Produção Industrial --- Brasil (IBGE, Série 21859 BCB).}
+\label{fig:serie}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{02_stl.png}
+\caption{Decomposição STL.}
+\label{fig:stl}
+\end{figure}
+
+O teste ADF indica não estacionariedade em nível ($p = 0{,}17$) e
+estacionariedade na primeira diferença ($p = 0{,}0001$).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{03_boxplot.png}
+\caption{Sazonalidade mensal --- queda em jan., fev.\ e dez.}
+\label{fig:box}
+\end{figure}
+
+\subsection{Configuração}
+
+\begin{table}[H]
+\centering
+\caption{Hiperparâmetros do Prophet.}
+\begin{tabular}{ll}
+    \toprule
+    Tendência & Linear, changepoints automáticos (25 detectados) \\
+    \texttt{changepoint\_prior\_scale} & 0.1 \\
+    \texttt{changepoint\_range} & 0.85 \\
+    Sazonalidade & Aditiva, Fourier $N = 8$ \\
+    \texttt{seasonality\_prior\_scale} & 10.0 \\
+    Feriados & Carnaval (afeta produção em fev./mar.) \\
+    IC & 95\% \\
+    Divisão & 80\%/20\% temporal (231/58 obs.) \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Componentes}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{05_componentes.png}
+\caption{Componentes estimados pelo Prophet.}
+\label{fig:comp}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{06_changepoints.png}
+\caption{Changepoints na tendência.}
+\label{fig:cp}
+\end{figure}
+
+\subsection{Resultados}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{07_real_vs_previsto.png}
+\caption{Real vs.\ Prophet (teste) com IC 95\%.}
+\label{fig:prev}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Métricas de desempenho.}
+\label{tab:metricas}
+\begin{tabular}{lr}
+    \toprule
+    RMSE & 4.67 \\
+    MAE & 3.91 \\
+    MAPE & 3.79\% \\
+    $R^2$ & 0.5731 \\
+    $U$ de Theil & 0.0233 \\
+    Cobertura IC 95\% & 100.0\% \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Benchmarks}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{11_benchmarks.png}
+\caption{MAPE: Prophet vs.\ benchmarks.}
+\label{fig:bench}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Comparação com benchmarks.}
+\label{tab:bench}
+\begin{tabular}{lrrr}
+    \toprule
+    \textbf{Modelo} & \textbf{RMSE} & \textbf{MAE} & \textbf{MAPE} \\
+    \midrule
+    Prophet   & 4.67 & 3.91 & 3.79\% \\
+    Naïve     & 5.62 & 4.51 & 4.46\% \\
+    S-Naïve   & 2.53 & 1.81 & 1.76\% \\
+    Média     & 7.15 & 6.04 & 6.01\% \\
+    Drift     & 7.05 & 5.97 & 5.98\% \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+O Prophet superou os benchmarks Naïve, Média e Drift, porém o
+Sazonal-Naïve obteve MAPE inferior (1.76\% vs.\ 3.79\%),
+indicando que a sazonalidade é o componente dominante nesta série
+no período recente.
+
+\subsection{Validação cruzada}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{10_cv_mape.png}
+\caption{MAPE por horizonte (validação cruzada temporal).}
+\label{fig:cv}
+\end{figure}
+
+MAPE médio da CV: 4.88\%. RMSE médio da CV: 6.84.
+
+\subsection{Diagnósticos dos resíduos}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{09_diagnosticos.png}
+\caption{Diagnósticos: resíduos, histograma, QQ-Plot, ACF.}
+\label{fig:diag}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Testes dos resíduos ($\alpha = 5\%$).}
+\label{tab:testes}
+\begin{tabular}{llcl}
+    \toprule
+    \textbf{Teste} & $H_0$ & \textbf{p-valor} &
+    \textbf{Decisão} \\
+    \midrule
+    Jarque-Bera & Normalidade & 0.7003 & Não rejeita $H_0$ (Normal) \\
+    Ljung-Box (12) & Sem autocorrelação & $<0.0001$ & Rejeita $H_0$ (Autocorrelação) \\
+    Teste $t$ & Média $= 0$ & $<0.0001$ & Rejeita $H_0$ (Viés) \\
+    Spearman & Homocedasticidade & $<0.0001$ & Rejeita $H_0$ (Heterocedasticidade) \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+Os resíduos apresentam distribuição normal (Jarque-Bera, $p = 0{,}70$),
+porém exibem viés sistemático positivo (média $= 3{,}47$), autocorrelação
+significativa e heterocedasticidade. Esses resultados confirmam a
+limitação teórica do Prophet de tratar $\varepsilon_t$ como i.i.d.
+
+% ============================================================
+\section{Discussão Crítica}
+
+\subsection{Vantagens}
+\begin{enumerate}[nosep, leftmargin=*]
+    \item \textbf{Decomposição interpretável}: tendência,
+    sazonalidade e feriados estimados e visualizados separadamente
+    --- permite ao analista entender o que impulsiona a previsão.
+    \item \textbf{Changepoints automáticos}: identificou 25 mudanças
+    estruturais (crise 2008, recessão 2015, COVID) sem
+    intervenção manual.
+    \item \textbf{ICs nativos} por simulação bayesiana, com
+    cobertura de 100\% no teste.
+    \item \textbf{Não requer estacionariedade}: o teste ADF
+    indicou não estacionariedade em nível ($p = 0{,}17$), mas o
+    Prophet não necessita de diferenciação.
+    \item \textbf{Robusto a dados faltantes}.
+    \item \textbf{Feriados integrados}: Carnaval afeta a produção
+    industrial e é modelado diretamente.
+\end{enumerate}
+
+\subsection{Desvantagens}
+\begin{enumerate}[nosep, leftmargin=*]
+    \item \textbf{Não modela autocorrelação residual}:
+    $\varepsilon_t$ é tratado como i.i.d. O teste de Ljung-Box
+    confirmou autocorrelação significativa ($p < 0{,}0001$).
+    \item \textbf{Viés sistemático}: o teste $t$ indicou média
+    dos resíduos de 3.47 ($p < 0{,}0001$), ou seja, o Prophet
+    subestima sistematicamente a produção no período de teste.
+    \item \textbf{Sazonalidade fixa}: coeficientes de Fourier não
+    mudam no tempo --- séries com sazonalidade evolutiva são mal
+    representadas.
+    \item \textbf{Extrapolação linear}: tendência pode divergir
+    para horizontes longos.
+    \item \textbf{Escolha aditivo/multiplicativo} é manual e
+    impactante.
+\end{enumerate}
+
+\subsection{Limitações nesta série}
+\begin{enumerate}[nosep, leftmargin=*]
+    \item A produção industrial brasileira sofreu choques extremos
+    (COVID-19: queda de $\approx 25\%$ em abril/2020), que o
+    Prophet trata como ruído, não como evento estruturado.
+    \item A tendência industrial brasileira é irregular (crescimento
+    até 2013, estagnação 2014--2019, choque 2020, recuperação),
+    exigindo muitos changepoints.
+    \item O $R^2 = 0{,}57$ indica que o modelo explica pouco mais
+    da metade da variabilidade no teste.
+    \item O Sazonal-Naïve superou o Prophet (MAPE 1.76\% vs.\
+    3.79\%), sugerindo que a sazonalidade domina e a tendência
+    estimada introduz mais erro do que benefício.
+\end{enumerate}
+
+\subsection{Interpretação dos diagnósticos}
+
+Os diagnósticos dos resíduos revelam três problemas:
+
+\begin{enumerate}[nosep, leftmargin=*]
+    \item \textbf{Viés sistemático}: a média dos resíduos é 3.47
+    (teste $t$, $p < 0{,}0001$), indicando que o Prophet subestima
+    sistematicamente a produção industrial no período de teste
+    (abr/2021 a jan/2026). Isso se deve à tendência linear do
+    modelo, que projeta a queda de 2020 adiante, enquanto a
+    recuperação pós-COVID elevou os índices.
+
+    \item \textbf{Autocorrelação residual}: o teste de Ljung-Box
+    rejeita $H_0$ em todos os lags ($p < 0{,}0001$), confirmando
+    que o Prophet não captura a dependência temporal dos erros ---
+    exatamente a limitação teórica do modelo, que trata
+    $\varepsilon_t$ como i.i.d.
+
+    \item \textbf{Heterocedasticidade}: o coeficiente de Spearman
+    entre $|e_t|$ e $t$ é $\rho = 0{,}69$ ($p < 0{,}0001$),
+    indicando que os erros crescem ao longo do horizonte ---
+    comportamento esperado quando a tendência diverge.
+
+    \item \textbf{Normalidade}: o único teste favorável é o
+    Jarque-Bera ($p = 0{,}70$), indicando que a \textit{distribuição}
+    dos resíduos é aproximadamente normal, embora sua estrutura
+    temporal não seja ruído branco.
+\end{enumerate}
+
+\subsection{Como melhorar}
+\begin{enumerate}[nosep, leftmargin=*]
+    \item Adicionar \textbf{COVID-19 como feriado} com
+    \texttt{lower\_window} e \texttt{upper\_window} para
+    modelar explicitamente o choque.
+    \item Regressores externos: taxa SELIC, câmbio, índice de
+    confiança da indústria (FGV).
+    \item Otimizar hiperparâmetros via validação cruzada
+    (grid search em $\tau$ e $\sigma_s$).
+    \item Modelo híbrido: Prophet + ARIMA nos resíduos, para
+    capturar a autocorrelação residual detectada.
+    \item Tendência logística com capacidade de saturação.
+\end{enumerate}
+
+% ============================================================
+\section{Conclusão}
+
+O Prophet decompõe séries temporais em tendência (changepoints
+bayesianos), sazonalidade (Fourier) e feriados, estimados via MAP.
+Na ilustração com a produção industrial brasileira (IBGE, Série
+21859, jan/2002 a jan/2026, 289 observações), o modelo capturou
+os padrões sazonais e as mudanças de tendência, obtendo MAPE de
+3.79\% no teste e 4.88\% na validação cruzada, com cobertura de
+100\% do intervalo de confiança de 95\%.
+
+Contudo, os diagnósticos revelaram limitações importantes: embora
+os resíduos sigam distribuição normal (Jarque-Bera, $p = 0{,}70$),
+o teste $t$ indicou viés sistemático (média dos resíduos $= 3{,}47$,
+$p < 0{,}0001$), o teste de Ljung-Box detectou autocorrelação
+residual significativa ($p < 0{,}0001$ em todos os lags), e o teste
+de Spearman apontou heterocedasticidade ($\rho = 0{,}69$,
+$p < 0{,}0001$). O $R^2 = 0{,}57$ no teste indica que o modelo
+explica pouco mais da metade da variabilidade, e o Sazonal-Naïve
+superou o Prophet em todas as métricas (MAPE de 1.76\% vs.\ 3.79\%).
+
+Esses resultados confirmam que a principal fraqueza do Prophet é
+\textbf{não modelar a autocorrelação residual}, tratando
+$\varepsilon_t$ como i.i.d. O viés positivo sugere subestimação
+sistemática. Melhorias possíveis incluem: modelo híbrido
+Prophet+ARIMA nos resíduos, inclusão de COVID-19 como evento
+especial, e regressores externos (SELIC, câmbio). Ainda assim,
+o modelo se mostrou superior aos benchmarks Naïve, Média e Drift,
+e sua força permanece na \textbf{interpretabilidade} dos
+componentes e na facilidade de uso.
+
+% ============================================================
+\newpage
+\section*{Referências}
+\addcontentsline{toc}{section}{Referências}
+
+\begin{thebibliography}{99}
+
+% ============================================================
+% REFERÊNCIAS DO PROFESSOR (Bibliografia da disciplina)
+% ============================================================
+
+\bibitem{morettin2017}
+MORETTIN, P.~A.
+\textit{Econometria Financeira: Um Curso em Séries Temporais
+Financeiras}. 3.ª~ed. Blucher, São Paulo, 2017.
+ISBN: 978-85-212-1157-0.
+
+\bibitem{morettin2006}
+MORETTIN, P.~A.; TOLOI, C.~M.~C.
+\textit{Análise de Séries Temporais}. 2.ª~ed.
+ABE --- Projeto Fisher. Blucher, São Paulo, 2006.
+ISBN: 978-85-212-0389-6.
+
+\bibitem{morettin2020}
+MORETTIN, P.~A.; TOLOI, C.~M.~C.
+\textit{Análise de Séries Temporais, Volume 2: Modelos
+Multivariados e Não-Lineares}. ABE --- Projeto Fisher. Blucher,
+São Paulo, 2020.
+ISBN: 978-85-212-1626-1.
+
+
+% ============================================================
+% REFERÊNCIAS DO MODELO PROPHET E COMPLEMENTARES
+% ============================================================
+
+\bibitem{taylor2018}
+TAYLOR, S.~J.; LETHAM, B.
+Forecasting at scale.
+\textit{The American Statistician}, v.~72, n.~1, p.~37--45, 2018.
+ISSN: 0003-1305.
+
+\bibitem{box2015}
+BOX, G.~E.~P.; JENKINS, G.~M.; REINSEL, G.~C.; LJUNG, G.~M.
+\textit{Time Series Analysis: Forecasting and Control}.
+5th~ed. Wiley, 2015.
+ISBN: 978-1-118-67502-1.
+
+\bibitem{harvey1993}
+HARVEY, A.~C.; SHEPHARD, N.
+Structural time series models. In: \textit{Handbook of
+Statistics}, v.~11. Elsevier, 1993.
+ISBN: 978-0-444-89572-2.
+
+\bibitem{carpenter2017}
+CARPENTER, B. et al.
+Stan: A probabilistic programming language.
+\textit{Journal of Statistical Software}, v.~76, n.~1, 2017.
+ISSN: 1548-7660.
+
+\bibitem{hyndman2021}
+HYNDMAN, R.~J.; ATHANASOPOULOS, G.
+\textit{Forecasting: Principles and Practice}. 3rd~ed. OTexts,
+2021.
+ISBN: 978-0-9875071-3-6.
+
+\bibitem{lewis1982}
+LEWIS, C.~D.
+\textit{Industrial and Business Forecasting Methods}.
+Butterworth-Heinemann, 1982.
+ISBN: 978-0-408-00532-2.
+
+\bibitem{ibge2025}
+IBGE. Pesquisa Industrial Mensal --- Produção Física (PIM-PF).
+Disponível em:
+\nolinkurl{https://www.ibge.gov.br/estatisticas/economicas/industria/9294-pesquisa-industrial-mensal-producao-fisica-brasil.html}.
+Acesso em: jul.\ 2025.
+
+\end{thebibliography}
+\end{document}
