@@ -12,8 +12,7 @@ Este repositório reúne os materiais desenvolvidos na disciplina de Séries Tem
 
 ### Conteúdo do Trabalho 1
 * `trabalho_1.py`: Código completo em Python contendo análise exploratória, ajuste do modelo, métricas de avaliação, benchmarks (*Sazonal-Naïve*), validação cruzada temporal, previsão futura e diagnósticos.
-* `trabalho_1.tex`: Relatório em LaTeX com a formulação matemática, resultados empíricos, discussões críticas e referências.
-* `01_serie.png` a `12_previsao.png`: Figuras de diagnóstico e resultados exportadas pelo script.
+* `trabalho_1.pdf`: Relatório em desenvolvido em LaTeX com a formulação matemática, resultados empíricos, discussões críticas e referências.
 
 ### Principais Resultados do Trabalho 1
 * **MAPE no conjunto de teste (58 meses):** 3,79%.
@@ -50,6 +49,6 @@ Foram comparados três modelos por máxima verossimilhança com inovações $t$-
 
 ### Conteúdo do Trabalho 2
 * `trabalho_2.py`: Roteiro em Python englobando o pipeline estatístico completo: download/limpeza via Yahoo Finance, testes descritivos (Jarque-Bera, ADF, KPSS, ARCH-LM), estimação das equações de média/volatilidade, extração de resíduos padronizados e cálculo/backtesting do VaR.
-* `trabalho_2.tex`: Relatório em LaTeX estruturado com contextualização de mercado, fundamentação de volatilidade condicional, tabelas estatísticas e discussões críticas sobre as limitações do modelo (como a persistência próxima da não-estacionariedade com $\beta = 0,989$).
-* `figuras_trabalho_2/`: Gráficos gerados incluindo séries históricas, histograma vs normal, curvas de ACF/PACF e as bandas dinâmicas do VaR superpostas aos retornos reais.
+* `trabalho_2.pdf`: Relatório em LaTeX estruturado com contextualização de mercado, fundamentação de volatilidade condicional, tabelas estatísticas e discussões críticas sobre as limitações do modelo (como a persistência próxima da não-estacionariedade com $\beta = 0,989$).
+
 
